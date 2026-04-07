@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  --color-journal-dark: #1C1C1E;
+  --color-journal-navy: #000080;
+  --color-journal-crimson: #DC143C;
+  --color-journal-highlight: #FFCC00;
+  --color-journal-paper: #f8f5ed;
+  --color-desk-surface: #1e293b;
+}
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--color-desk-surface);
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Wooden table texture — repeating background for the desk surface */
+.bg-table-texture {
+  background-image: url('./assets/background/bg_wooden_table.webp');
+  background-repeat: repeat;
+  background-size: cover;
+  background-color: var(--color-desk-surface);
+}
+
+/* Paper texture — repeating background for journal pages */
+.bg-paper-texture {
+  background-image: url('./assets/background/bg_paper.webp');
+  background-repeat: repeat;
+  background-size: cover;
+  background-color: var(--color-journal-paper);
+}
+
+/* Book shadow — multi-layered for realistic physical depth */
+.book-shadow {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.25),
+    0 4px 6px rgba(0, 0, 0, 0.2),
+    0 12px 24px rgba(0, 0, 0, 0.18),
+    0 24px 48px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+/* Center spine shadow — the crease between two pages */
+.spine-shadow {
+  box-shadow:
+    inset 6px 0 12px -4px rgba(0, 0, 0, 0.15),
+    inset -6px 0 12px -4px rgba(0, 0, 0, 0.15);
+}
+
+/* Left page inner shadow for depth (light comes from left) */
+.page-shadow-left {
+  box-shadow:
+    inset -4px 0 12px -4px rgba(0, 0, 0, 0.08),
+    inset 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+}
+
+/* Right page inner shadow for depth */
+.page-shadow-right {
+  box-shadow:
+    inset 4px 0 12px -4px rgba(0, 0, 0, 0.08),
+    inset 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+}
