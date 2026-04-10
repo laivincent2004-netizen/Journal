@@ -85,14 +85,18 @@ export default function App() {
   // Keyboard deletion: Backspace or Delete removes the selected image
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.key === 'Backspace' || e.key === 'Delete') && selectedImageId !== null && focusedPageId !== null) {
-        e.preventDefault()
-        deleteImage(focusedPageId, selectedImageId)
+      if ((e.key === 'Backspace' || e.key === 'Delete') && selectedImageId !== null) {
+        // Find which page owns this image
+        const ownerPage = pages.find(p => p.images.some(img => img.id === selectedImageId))
+        if (ownerPage) {
+          e.preventDefault()
+          deleteImage(ownerPage.id, selectedImageId)
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedImageId, focusedPageId, deleteImage])
+  }, [selectedImageId, pages, deleteImage])
 
   // Currently visible spread (first two pages)
   const spread = pages.slice(0, 2)
@@ -113,6 +117,18 @@ export default function App() {
       {/* Journal Book Container — no z-index set, so children participate
           in the root stacking context and can layer above the z-30 overlay */}
       <div className="relative book-shadow rounded-sm flex" style={{ height: '75vh' }}>
+        {/* Journal cover — violet hardcover peeking out behind the pages */}
+        <div
+          className="absolute rounded-md pointer-events-none"
+          style={{
+            inset: '-6px -8px -6px -8px',
+            background: 'linear-gradient(135deg, #6d28d9, #7c3aed, #5b21b6)',
+            zIndex: -1,
+            boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.2), inset 0 -1px 3px rgba(255,255,255,0.1)',
+            borderRadius: '6px',
+          }}
+        />
+
         {/* Spine / center crease */}
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-1 spine-shadow z-20 pointer-events-none" />
 
