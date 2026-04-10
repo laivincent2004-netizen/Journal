@@ -1,9 +1,15 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import Canvas from './Canvas'
+import ImageLayer from './ImageLayer'
 
 export default function Page({
   pageData,
   updateStrokes,
+  addImage,
+  updateImage,
+  deleteImage,
+  selectedImageId,
+  setSelectedImageId,
   activeTool,
   activeColor,
   isFocused,
@@ -14,8 +20,9 @@ export default function Page({
   const pageRef = useRef(null)
   const [currentStroke, setCurrentStroke] = useState(null)
   const [focusTransform, setFocusTransform] = useState(null)
+  const [isDragOver, setIsDragOver] = useState(false)
 
-  // Compute the CSS transform to center + scale this page to fill the viewport
+  // ---- Focus Mode Transform ----
   useEffect(() => {
     if (isFocused && pageRef.current) {
       const rect = pageRef.current.getBoundingClientRect()
@@ -23,7 +30,6 @@ export default function Page({
       const vh = window.innerHeight
       const aspect = 5 / 8
 
-      // Target dimensions: fill 85% of viewport while maintaining 5/8 ratio
       const fill = 0.85
       const maxH = vh * fill
       const wFromH = maxH * aspect
@@ -41,7 +47,6 @@ export default function Page({
 
       const scale = targetW / rect.width
 
-      // Translate from current center to viewport center
       const currentCenterX = rect.left + rect.width / 2
       const currentCenterY = rect.top + rect.height / 2
       const tx = vw / 2 - currentCenterX
@@ -53,10 +58,7 @@ export default function Page({
     }
   }, [isFocused])
 
-  // When the CSS transition finishes, resize the canvas to its new
-  // physical DOM size and redraw all strokes at native resolution.
-  // This is the "blur fix": CSS scale() is used for the smooth animation,
-  // then we snap to crisp rendering once the animation completes.
+  // Phase 2 blur fix: after focus transition, resize the single canvas
   const handleTransitionEnd = useCallback((e) => {
     if (e.propertyName !== 'transform') return
     if (canvasRef.current) {
@@ -64,23 +66,63 @@ export default function Page({
     }
   }, [])
 
-  // Wrapper to update strokes in the central pages state
+  // Stroke updater scoped to this page
   const setStrokes = useCallback((updater) => {
     updateStrokes(pageData.id, updater)
   }, [pageData.id, updateStrokes])
 
+  // Single click on empty background deselects images
   const handleClick = (e) => {
-    // Only enter Focus Mode when the pointer/select tool is active
+    if (activeTool === 'pointer') {
+      setSelectedImageId(null)
+    }
+  }
+
+  // Double-click to enter Focus Mode
+  const handleDoubleClick = (e) => {
     if (!isFocused && activeTool === 'pointer') {
       e.stopPropagation()
       onFocus(pageData.id)
     }
   }
 
-  // Shadow class based on which side of the spine this page is on
-  const pageShadowClass = side === 'left' ? 'page-shadow-left' : 'page-shadow-right'
+  // ---- Drag-and-Drop Image Handling ----
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }, [])
 
-  // Cursor: crosshair for drawing tools, default pointer for pointer tool
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+    if (files.length === 0) return
+
+    files.forEach(file => {
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result
+        const img = new Image()
+        img.onload = () => {
+          addImage(pageData.id, dataUrl, img.naturalWidth, img.naturalHeight)
+        }
+        img.src = dataUrl
+      }
+      reader.readAsDataURL(file)
+    })
+  }, [pageData.id, addImage])
+
+  // ---- Styling ----
+  const pageShadowClass = side === 'left' ? 'page-shadow-left' : 'page-shadow-right'
   const cursorClass = activeTool === 'pointer' ? 'cursor-pointer' : 'cursor-crosshair'
 
   return (
@@ -93,23 +135,53 @@ export default function Page({
           ? `z-40 shadow-2xl ${cursorClass}`
           : `${pageShadowClass} ${cursorClass} hover:brightness-[0.98]`
         }
+        ${isDragOver ? 'page-drag-over' : ''}
       `}
       style={{
         transform: focusTransform || 'none',
         transformOrigin: 'center center',
       }}
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onTransitionEnd={handleTransitionEnd}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
-      <Canvas
-        ref={canvasRef}
-        activeTool={activeTool}
-        activeColor={activeColor}
-        strokes={pageData.strokes}
-        setStrokes={setStrokes}
-        currentStroke={currentStroke}
-        setCurrentStroke={setCurrentStroke}
-      />
+      {/* ========= BOTTOM PLANE: Images ========= */}
+      <div className="absolute inset-0" style={{ zIndex: 0 }}>
+        {pageData.images.map(image => (
+          <ImageLayer
+            key={image.id}
+            layer={image}
+            activeTool={activeTool}
+            isSelected={selectedImageId === image.id}
+            onSelect={() => setSelectedImageId(image.id)}
+            onMove={(x, y) => updateImage(pageData.id, image.id, { x, y })}
+            onRotate={(rotation) => updateImage(pageData.id, image.id, { rotation })}
+            pageRef={pageRef}
+          />
+        ))}
+      </div>
+
+      {/* ========= TOP PLANE: Single Canvas ========= */}
+      <div
+        className="absolute inset-0"
+        style={{
+          zIndex: 1,
+          pointerEvents: activeTool === 'pointer' ? 'none' : 'auto',
+        }}
+      >
+        <Canvas
+          ref={canvasRef}
+          activeTool={activeTool}
+          activeColor={activeColor}
+          strokes={pageData.strokes}
+          setStrokes={setStrokes}
+          currentStroke={currentStroke}
+          setCurrentStroke={setCurrentStroke}
+        />
+      </div>
     </div>
   )
 }

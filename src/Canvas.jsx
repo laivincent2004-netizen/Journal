@@ -1,4 +1,4 @@
-import { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react'
+import { useRef, useState, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react'
 import { generatePathData } from './utils'
 
 const Canvas = forwardRef(function Canvas(
@@ -7,14 +7,14 @@ const Canvas = forwardRef(function Canvas(
 ) {
   const canvasRef = useRef(null)
   const wrapperRef = useRef(null)
+  const [redrawTrigger, setRedrawTrigger] = useState(0)
 
   // Expose imperative method so Page can trigger a native-resolution redraw
   // after the CSS focus transition completes
   useImperativeHandle(ref, () => ({
     resizeAndRedraw() {
       syncCanvasSize()
-      // Force a redraw by triggering the strokes effect
-      setStrokes(prev => [...prev])
+      setRedrawTrigger(prev => prev + 1)
     }
   }))
 
@@ -39,13 +39,13 @@ const Canvas = forwardRef(function Canvas(
   useEffect(() => {
     const handleResize = () => {
       syncCanvasSize()
-      setStrokes(prev => [...prev])
+      setRedrawTrigger(prev => prev + 1)
     }
 
     window.addEventListener('resize', handleResize)
     handleResize()
     return () => window.removeEventListener('resize', handleResize)
-  }, [setStrokes, syncCanvasSize])
+  }, [syncCanvasSize])
 
   // Redraw all strokes whenever strokes or currentStroke change
   useEffect(() => {
@@ -76,7 +76,7 @@ const Canvas = forwardRef(function Canvas(
 
     strokes.forEach(s => drawStroke(s, false))
     if (currentStroke) drawStroke(currentStroke, true)
-  }, [strokes, currentStroke])
+  }, [strokes, currentStroke, redrawTrigger])
 
   // ---- POINTER MATH (CRITICAL) ----
   // Uses getBoundingClientRect() so coordinates are always relative to the
@@ -107,7 +107,7 @@ const Canvas = forwardRef(function Canvas(
     } else {
       setCurrentStroke({
         tool: activeTool,
-        color: activeTool === 'highlighter' ? '#FFCC00' : activeColor,
+        color: activeTool === 'highlighter' ? 'rgba(255, 204, 0, 0.4)' : activeColor,
         points: [pos]
       })
     }
@@ -148,11 +148,16 @@ const Canvas = forwardRef(function Canvas(
     }))
   }
 
+  // Pointer tool: none (let clicks fall to images below)
+  // Drawing tools: auto (intercept all clicks)
+  const pointerEvents = activeTool === 'pointer' ? 'none' : 'auto'
+
   return (
-    <div ref={wrapperRef} className="absolute inset-0 overflow-hidden">
+    <div ref={wrapperRef} className="absolute inset-0 overflow-hidden mix-blend-multiply" style={{ zIndex: 'inherit' }}>
       <canvas
         ref={canvasRef}
         className="absolute inset-0 touch-none"
+        style={{ pointerEvents }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
